@@ -11,7 +11,7 @@
             v-model="searchQuery" 
             placeholder="Rechercher un titre, un cinéaste, un acteur..." 
             shortcut="⌘ K" 
-            @input="handleSearch"
+            @update:model-value="handleSearch"
           />
         </div>
 
@@ -27,34 +27,19 @@
     <section class="movies-section">
       <div class="section-header">
         <div>
-          <span class="subtitle-tag">À L'AFFICHE</span>
-          <h2>Les films dont tout le monde parle</h2>
+          <span class="subtitle-tag">SÉLECTION TMDB</span>
+          <h2>{{ sectionTitle }}</h2>
         </div>
         <router-link to="/lists" class="see-all-link">Voir tous les films →</router-link>
       </div>
 
 
-      <div class="filters-row">
-        <button
-          :class="['filter-pill', { active: selectedGenreId === null }]"
-          @click="selectedGenreId = null"
-        >
-          Tous
-        </button>
-        <button
-          v-for="genre in genres"
-          :key="genre.id"
-          :class="['filter-pill', { active: selectedGenreId === genre.id }]"
-          @click="selectedGenreId = genre.id"
-        >
-          {{ genre.name }}
-        </button>
-      </div>
+      <p v-if="loadingMovies" class="no-results" role="status">Chargement des films...</p>
+      <p v-else-if="apiError" class="no-results" role="alert">{{ apiError }}</p>
 
-   
-      <div class="movies-grid">
+      <div v-else-if="movies.length" class="movies-grid">
         <MovieCard 
-          v-for="movie in featuredMovies" 
+          v-for="movie in movies" 
           :key="movie.id" 
           :movie="movie"
           @add-to-library="addToLibrary"
@@ -63,8 +48,8 @@
       </div>
 
 
-      <p v-if="filteredMovies.length === 0" class="no-results">
-        Aucun film trouvé pour cette catégorie.
+      <p v-else class="no-results">
+        {{ searchQuery.trim().length > 2 ? 'Aucun film trouvé pour cette recherche.' : 'Aucun film disponible.' }}
       </p>
     </section>
   </div>
@@ -74,42 +59,46 @@
 import { ref, computed, onMounted } from 'vue';
 import SearchBar from '../components/SearchBar.vue';
 import MovieCard from '../components/MovieCards.vue';
-import { getMovieGenres, getPopularMovies, searchMovies } from '../services/api.js';
+import { getTopRatedMovies, searchMovies } from '../services/api.js';
 
 const searchQuery = ref('');
 const movies = ref([]);
-const genres = ref([]);
-const selectedGenreId = ref(null);
-
+const topRatedMovies = ref([]);
+const loadingMovies = ref(true);
+const apiError = ref('');
+const sectionTitle = computed(() => searchQuery.value.trim().length > 2
+  ? 'Résultats de recherche'
+  : 'Les 20 films les mieux notés');
+let searchRequestId = 0;
 
 onMounted(async () => {
-  const [movieGenres, popularMovies] = await Promise.all([
-    getMovieGenres(),
-    getPopularMovies()
-  ]);
-
-  genres.value = movieGenres;
-  movies.value = popularMovies;
+  topRatedMovies.value = await getTopRatedMovies();
+  movies.value = topRatedMovies.value;
+  loadingMovies.value = false;
+  if (movies.value.length === 0) {
+    apiError.value = 'Impossible de charger les films. Vérifie ta connexion à TMDB.';
+  }
 });
 
+const handleSearch = async (query = searchQuery.value) => {
+  const currentRequestId = ++searchRequestId;
+  apiError.value = '';
 
-const handleSearch = async () => {
-  if (searchQuery.value.length > 2) {
-    movies.value = await searchMovies(searchQuery.value);
-  } else if (searchQuery.value.length === 0) {
-    movies.value = await getPopularMovies(); 
+  if (query.trim().length > 2) {
+    loadingMovies.value = true;
+    const results = await searchMovies(query);
+    if (currentRequestId !== searchRequestId) return;
+
+    movies.value = results;
+    loadingMovies.value = false;
+    if (results.length === 0) {
+      apiError.value = 'Aucun résultat trouvé pour cette recherche.';
+    }
+  } else {
+    movies.value = topRatedMovies.value;
+    loadingMovies.value = false;
   }
 };
-
-const filteredMovies = computed(() => {
-  if (selectedGenreId.value === null) {
-    return movies.value;
-  }
-
-  return movies.value.filter(movie => movie.genreIds.includes(selectedGenreId.value));
-});
-
-const featuredMovies = computed(() => filteredMovies.value.slice(0, 8));
 
 const addToLibrary = (movie) => {
   console.log("Ajouté à la bibliothèque :", movie.title);

@@ -54,6 +54,51 @@ export async function getPopularMovies(page = 1) {
     }
 }
 
+export async function getTopRatedMovies() {
+    try {
+        const params = new URLSearchParams({
+            api_key: API_KEY,
+            language: 'fr-FR',
+            page: '1'
+        });
+        const response = await fetch(`${BASE_URL}/movie/top_rated?${params}`);
+        if (!response.ok) {
+            throw new Error(`TMDB a répondu avec le statut ${response.status}`);
+        }
+
+        const data = await response.json();
+        return (data.results || []).map(mapMovie);
+    } catch (error) {
+        console.error('Erreur API des films les mieux notés :', error);
+        return [];
+    }
+}
+
+export async function getMoviesByGenre(genreId, page = 1) {
+    try {
+        const params = new URLSearchParams({
+            api_key: API_KEY,
+            language: 'fr-FR',
+            with_genres: String(genreId),
+            sort_by: 'popularity.desc',
+            page: String(page)
+        });
+        const response = await fetch(`${BASE_URL}/discover/movie?${params}`);
+        if (!response.ok) {
+            throw new Error(`TMDB a répondu avec le statut ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+            movies: (data.results || []).map(mapMovie),
+            totalPages: Math.min(data.total_pages || 0, 500)
+        };
+    } catch (error) {
+        console.error('Erreur API des films par genre :', error);
+        return { movies: [], totalPages: 0 };
+    }
+}
+
 export async function getMovieGenres() {
     try {
         const params = new URLSearchParams({
