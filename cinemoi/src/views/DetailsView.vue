@@ -13,6 +13,21 @@
             <p v-if="movie.originalTitle" class="original-title">{{ movie.originalTitle }} · {{ movie.year }}</p>
             <p class="meta">{{ movie.genres }} · {{ movie.runtime }} <span class="age-rating">12+</span></p>
 
+            <div class="personal-rating" aria-label="Votre note personnelle sur cinq">
+              <span>Ma note</span>
+              <div class="rating-stars">
+                <button
+                  v-for="star in 5"
+                  :key="star"
+                  type="button"
+                  :aria-label="`Noter ${star} sur 5`"
+                  :aria-pressed="personalRating === star"
+                  @click="savePersonalRating(star)"
+                >{{ star <= personalRating ? '★' : '☆' }}</button>
+              </div>
+              <span class="rating-value">{{ personalRating ? `${personalRating} / 5` : 'Pas encore noté' }}</span>
+            </div>
+
             <div class="actions">
               <!-- TODO: garder le style du cœur synchronisé avec l'état favori (rouge si actif, blanc sinon). -->
               <button
@@ -109,8 +124,7 @@ const store = useStore();
 const movie = ref(null);
 const recommendedMovies = ref([]);
 const recommendationsLoading = ref(false);
-
-// TODO: ajouter plus tard une critique et une note par film, chargées et sauvegardées dans localStorage avec l'ID du film.
+const personalRating = ref(0);
 
 const isFavorite = computed(() =>
   store.state.library.some(item => item.id === movie.value?.id && item.isFavorite)
@@ -120,6 +134,7 @@ watch(() => route.params.id, async (movieId) => {
   movie.value = null;
   recommendedMovies.value = [];
   recommendationsLoading.value = false;
+  personalRating.value = loadPersonalRating(movieId);
 
   const movieDetails = await getMovieDetails(movieId);
   movie.value = movieDetails;
@@ -131,6 +146,29 @@ watch(() => route.params.id, async (movieId) => {
     recommendationsLoading.value = false;
   }
 }, { immediate: true });
+
+function loadPersonalRating(movieId) {
+  try {
+    const savedRating = Number(localStorage.getItem(`cinemoi_rating_${movieId}`));
+    return Number.isInteger(savedRating) && savedRating >= 1 && savedRating <= 5
+      ? savedRating
+      : 0;
+  } catch (error) {
+    console.error('Impossible de charger la note personnelle :', error);
+    return 0;
+  }
+}
+
+const savePersonalRating = (rating) => {
+  if (!movie.value) return;
+
+  try {
+    localStorage.setItem(`cinemoi_rating_${movie.value.id}`, String(rating));
+    personalRating.value = rating;
+  } catch (error) {
+    console.error('Impossible de sauvegarder la note personnelle :', error);
+  }
+};
 
 const updateStatus = (status) => {
   if (!movie.value) return;
@@ -270,6 +308,37 @@ const toggleFavorite = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+}
+
+.personal-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1.2rem 0;
+  font-size: 0.82rem;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.rating-stars button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #e5ae36;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.rating-stars button:focus-visible {
+  outline: 2px solid #e5ae36;
+  outline-offset: 2px;
+}
+
+.rating-value {
+  color: #e5ae36;
 }
 
 .btn-secondary {
@@ -462,6 +531,10 @@ const toggleFavorite = () => {
     grid-template-columns: 1fr;
     gap: 1.75rem;
     padding: 1.5rem 1rem 2rem;
+  }
+
+  .personal-rating {
+    flex-wrap: wrap;
   }
 
   .synopsis-column {
