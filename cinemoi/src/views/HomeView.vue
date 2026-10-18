@@ -30,7 +30,7 @@
           <span class="subtitle-tag">À L'AFFICHE</span>
           <h2>Les films dont tout le monde parle</h2>
         </div>
-        <router-link to="/library" class="see-all-link">Voir tous les films →</router-link>
+        <router-link to="/lists" class="see-all-link">Voir tous les films →</router-link>
       </div>
 
 
@@ -54,7 +54,7 @@
    
       <div class="movies-grid">
         <MovieCard 
-          v-for="movie in filteredMovies" 
+          v-for="movie in featuredMovies" 
           :key="movie.id" 
           :movie="movie"
           @add-to-library="addToLibrary"
@@ -108,6 +108,8 @@ const filteredMovies = computed(() => {
 
   return movies.value.filter(movie => movie.genreIds.includes(selectedGenreId.value));
 });
+
+const featuredMovies = computed(() => filteredMovies.value.slice(0, 8));
 
 const addToLibrary = (movie) => {
   console.log("Ajouté à la bibliothèque :", movie.title);
@@ -252,8 +254,19 @@ const toggleFavorite = (movie) => {
 
 .movies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-columns: minmax(210px, 240px);
+  grid-auto-flow: column;
   gap: 2rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 0 0 1rem;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: #b85d38 #e2ded3;
+  scrollbar-width: thin;
+}
+
+.movies-grid > * {
+  scroll-snap-align: start;
 }
 
 .no-results {

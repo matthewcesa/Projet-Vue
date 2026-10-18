@@ -17,7 +17,12 @@ export default createStore({
     library: loadFromStorage('cinemoi_library'),
     
 
-    lists: loadFromStorage('cinemoi_lists')
+    // pour pas que la liste soit vide
+    lists: loadFromStorage('cinemoi_lists').length > 0 ? loadFromStorage('cinemoi_lists') : 
+        [
+            { id: 1, title: 'Mes films cultes', movies: [] },
+            { id: 2, title: 'Science-fiction préférée', movies: [] }
+        ]
   },
   
   mutations: {
@@ -39,6 +44,18 @@ export default createStore({
       saveToStorage('cinemoi_library', state.library);
     },
 
+    TOGGLE_FAVORITE(state, movie) {
+      const existing = state.library.find(item => item.id === movie.id);
+
+      if (existing) {
+        existing.isFavorite = !existing.isFavorite;
+      } else {
+        state.library.push({ ...movie, status: 'to-watch', isFavorite: true });
+      }
+
+      saveToStorage('cinemoi_library', state.library);
+    },
+
     // ajouter un film dans une lsite specifique
     ADD_TO_LIST(state, { movie, listName }) {
       const exists = state.lists.some(m => m.id === movie.id && m.listName === listName);
@@ -46,6 +63,11 @@ export default createStore({
         state.lists.push({ ...movie, listName });
         saveToStorage('cinemoi_lists', state.lists);
       }
+    },
+
+    ADD_NEW_LIST(state, newList) {
+        state.lists.push(newList);
+        saveToStorage('cinemoi_lists', state.lists);
     },
 
     // retirer un film d'une liste

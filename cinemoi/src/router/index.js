@@ -2,8 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import Details from '../views/DetailsView.vue'
 import Library from '../views/LibraryView.vue'
-import Favorites from "../views/FavoritesView.vue"
 import Connexion from '../views/ConnexionView.vue'
+import Listes from '../views/ListesView.vue'
 
 const routes = [
   {
@@ -17,11 +17,6 @@ const routes = [
     component: Library
   },
   {
-    path: '/favorites',
-    name: 'favorites',
-    component: Favorites
-  },
-  {
     path: '/movie/:id',
     name: 'details',
     component: Details,
@@ -31,6 +26,11 @@ const routes = [
     path: '/login',
     name: 'login',
     component: Connexion
+  },
+  {
+    path: '/lists',
+    name: 'lists',
+    component: Listes
   }
 ]
 

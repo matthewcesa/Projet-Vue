@@ -1,190 +1,472 @@
 <template>
-    <div class="details-view" v-if="movie">
-        <div class="backdrop" :style="{ backgroundImage: `url(${movie.backdrop})` }">
-            <div class="overlay">
-                <button class="back-btn" @click="$router.go(-1)">← Retour</button>
+  <div v-if="movie" class="details-view">
+    <section class="film-hero" :style="{ '--backdrop-image': `url(${movie.backdrop})` }">
+      <div class="film-hero-inner">
+        <button class="back-btn" type="button" @click="$router.go(-1)">← Retour</button>
+
+        <div class="hero-layout">
+          <img :src="movie.poster" :alt="movie.title" class="details-poster" />
+
+          <div class="details-info">
+            <p class="availability"><span></span> DISPONIBLE EN STREAMING</p>
+            <h1>{{ movie.title }}</h1>
+            <p v-if="movie.originalTitle" class="original-title">{{ movie.originalTitle }} · {{ movie.year }}</p>
+            <p class="meta">{{ movie.genres }} · {{ movie.runtime }} <span class="age-rating">12+</span></p>
+
+            <div class="actions">
+              <!-- TODO: garder le style du cœur synchronisé avec l'état favori (rouge si actif, blanc sinon). -->
+              <button
+                class="btn-secondary"
+                type="button"
+                :aria-pressed="isFavorite"
+                @click="toggleFavorite"
+              >
+                <span aria-hidden="true">{{ isFavorite ? '♥' : '♡' }}</span> Favori
+              </button>
+              <button class="btn-secondary" type="button" @click="updateStatus('watched')">
+                <span aria-hidden="true">✓</span> Marquer comme vu
+              </button>
             </div>
+          </div>
         </div>
+      </div>
+    </section>
 
-        <div class="content-container">
-            <img :src="movie.poster" :alt="movie.title" class="details-poster" />
-            
-            <div class="details-info">
-                <h1>{{ movie.title }}</h1>
-                <p class="meta">{{ movie.genres }} · {{ movie.year }} · {{ movie.runtime }}</p>
-                
-                <div class="rating-badge">
-                    ⭐ {{ movie.rating }} / 10
-                </div>
+    <section class="details-lower">
+      <div class="synopsis-column">
+        <span class="section-kicker">L’HISTOIRE</span>
+        <h2>Synopsis</h2>
+        <p class="overview">{{ movie.overview }}</p>
+        <div class="film-facts">
+          <div>
+            <span>Réalisation</span>
+            <strong>{{ movie.director || 'Non renseigné' }}</strong>
+          </div>
+          <div>
+            <span>Sortie en salle</span>
+            <strong>{{ movie.releaseDate || movie.year }}</strong>
+          </div>
+        </div>
+      </div>
 
-                <h3>Synopsis</h3>
-                <p class="overview">{{ movie.overview }}</p>
-
-                <div class="actions">
-                    <button class="btn-primary" @click="updateStatus('to-watch')"> Ajouter à "À voir"</button>
-                    <button class="btn-secondary" @click="updateStatus('watched')">Marquer comme "Vu"</button>
-                </div>
+      <section class="cast-section" aria-labelledby="cast-heading">
+        <h2 id="cast-heading">Distribution</h2>
+        <div v-if="movie.cast?.length" class="cast-grid">
+          <article v-for="person in movie.cast.slice(0, 3)" :key="person.id" class="cast-member">
+            <img
+              v-if="person.profile"
+              class="cast-photo"
+              :src="person.profile"
+              :alt="`Portrait de ${person.name}`"
+              loading="lazy"
+            />
+            <div v-else class="cast-photo cast-photo-fallback" aria-hidden="true">
+              {{ person.name.charAt(0) }}
             </div>
+            <div class="cast-credit">
+              <h3>{{ person.name }}</h3>
+              <p>{{ person.character || 'Rôle non précisé' }}</p>
+            </div>
+          </article>
         </div>
-    </div>
-  <div v-else class="loading">
-    Chargement des détails...
+        <p v-else class="cast-empty">Aucune information de distribution disponible.</p>
+      </section>
+
+      <section class="recommendations-section" aria-labelledby="recommendations-heading">
+        <h2 id="recommendations-heading">Vous aimerez aussi</h2>
+        <p v-if="recommendationsLoading" class="recommendations-message">Recherche de films similaires...</p>
+        <div v-else-if="recommendedMovies.length" class="recommendations-list">
+          <router-link
+            v-for="recommendedMovie in recommendedMovies"
+            :key="recommendedMovie.id"
+            :to="{ name: 'details', params: { id: recommendedMovie.id } }"
+            class="recommendation-item"
+          >
+            <img :src="recommendedMovie.poster" :alt="recommendedMovie.title" loading="lazy" />
+            <div>
+              <h3>{{ recommendedMovie.title }}</h3>
+              <p>{{ recommendedMovie.genre }} · {{ recommendedMovie.year }}</p>
+              <strong>☆ {{ recommendedMovie.rating }}</strong>
+            </div>
+          </router-link>
+        </div>
+        <p v-else class="recommendations-message">Aucune suggestion disponible.</p>
+      </section>
+    </section>
   </div>
+
+  <div v-else class="loading">Chargement des détails...</div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { getMovieDetails } from '../services/api';
 import { useStore } from 'vuex';
+import { getMovieDetails, getMovieRecommendations } from '../services/api.js';
 
 const route = useRoute();
-const movie = ref(null);
 const store = useStore();
+const movie = ref(null);
+const recommendedMovies = ref([]);
+const recommendationsLoading = ref(false);
 
-onMounted(async () => {
-  const movieId = route.params.id;
-  movie.value = await getMovieDetails(movieId);
-});
-/*
-const addToLibrary = () => {
-  console.log("Ajouté :", movie.value.title);
+// TODO: ajouter plus tard une critique et une note par film, chargées et sauvegardées dans localStorage avec l'ID du film.
+
+const isFavorite = computed(() =>
+  store.state.library.some(item => item.id === movie.value?.id && item.isFavorite)
+);
+
+watch(() => route.params.id, async (movieId) => {
+  movie.value = null;
+  recommendedMovies.value = [];
+  recommendationsLoading.value = false;
+
+  const movieDetails = await getMovieDetails(movieId);
+  movie.value = movieDetails;
+
+  if (movieDetails?.genreIds?.length) {
+    recommendationsLoading.value = true;
+    const suggestions = await getMovieRecommendations(movieId, movieDetails.genreIds);
+    recommendedMovies.value = suggestions.slice(0, 2);
+    recommendationsLoading.value = false;
+  }
+}, { immediate: true });
+
+const updateStatus = (status) => {
+  if (!movie.value) return;
+
+  store.commit('ADD_TO_LIBRARY', {
+    movie: movie.value,
+    status
+  });
 };
 
 const toggleFavorite = () => {
-  console.log("Favori :", movie.value.title);
-};
-*/
-const updateStatus = (status) => {
-  if (!movie.value) return;
-  
-  store.commit('ADD_TO_LIBRARY', { 
-    movie: movie.value, 
-    status: status 
-  });
-  
-  alert(`Film enregistré dans votre bibliothèque (${status === 'watched' ? 'Vu' : 'À voir'}) !`);
+  if (movie.value) {
+    store.commit('TOGGLE_FAVORITE', movie.value);
+  }
 };
 </script>
 
 <style scoped>
 .details-view {
-  background-color: #fcf9f2;
   min-height: 100vh;
-  color: #1a1a1a;
-  padding-bottom: 4rem;
+  background: #f7f1e6;
+  color: #292522;
 }
 
-.backdrop {
-  height: 400px;
-  background-size: cover;
-  background-position: center;
+.film-hero {
   position: relative;
+  isolation: isolate;
+  min-height: 370px;
+  padding: 1.4rem clamp(1.25rem, 4vw, 3rem) 2rem;
+  background: #171316;
+  color: #f8f4ed;
 }
 
-.overlay {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(252,249,242,1));
-  height: 100%;
-  padding: 2rem 3rem;
+.film-hero::before {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background-image: var(--backdrop-image);
+  background-position: center 35%;
+  background-size: cover;
+  content: '';
+}
+
+.film-hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(18, 13, 17, 0.93), rgba(18, 13, 17, 0.74) 60%, rgba(18, 13, 17, 0.62));
+  content: '';
+}
+
+.film-hero-inner {
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
 .back-btn {
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
+  margin-bottom: 1rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #f8f4ed;
+  font: inherit;
   cursor: pointer;
-  font-weight: bold;
-  backdrop-filter: blur(4px);
 }
 
-.content-container {
-  max-width: 1100px;
-  margin: -100px auto 0 auto;
-  display: flex;
-  gap: 3rem;
-  padding: 0 3rem;
-  position: relative;
-  z-index: 2;
+.hero-layout {
+  display: grid;
+  grid-template-columns: minmax(170px, 240px) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
 }
 
 .details-poster {
-  width: 300px;
-  height: 450px;
+  width: 100%;
+  aspect-ratio: 2 / 3;
   object-fit: cover;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  border: 2px solid #2ea8d7;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .details-info {
-  flex: 1;
-  padding-top: 2rem;
+  min-width: 0;
+  padding-top: 0.2rem;
+}
+
+.availability {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.availability span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #57bd78;
+}
+
+.details-info h1,
+.details-lower h2 {
+  font-family: Georgia, 'Times New Roman', serif;
 }
 
 .details-info h1 {
-  font-size: 2.5rem;
-  font-family: serif;
-  margin-bottom: 0.5rem;
+  margin: 0 0 0.25rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.original-title {
+  margin-bottom: 0.7rem;
+  color: #bbb4b8;
+  font-style: italic;
 }
 
 .meta {
-  color: #666;
-  font-size: 1rem;
-  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  color: #d0c9cc;
+  font-size: 0.9rem;
 }
 
-.rating-badge {
-  display: inline-block;
-  background: #1a1a1a;
-  color: #ffc107;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-weight: bold;
-  margin-bottom: 1.5rem;
-}
-
-.details-info h3 {
-  font-size: 1.2rem;
-  font-family: serif;
-  margin-bottom: 0.5rem;
-}
-
-.overview {
-  color: #444;
-  line-height: 1.6;
-  margin-bottom: 2rem;
+.age-rating {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  font-size: 0.7rem;
 }
 
 .actions {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
-.btn-primary {
-  background-color: #b85d38;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 30px;
-  font-weight: bold;
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .btn-secondary {
-  background-color: transparent;
-  color: #1a1a1a;
-  border: 1px solid #1a1a1a;
-  padding: 12px 24px;
-  border-radius: 30px;
-  font-weight: bold;
-  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+.btn-secondary[aria-pressed='true'] {
+  border-color: #e06b58;
+  color: #ff9a85;
+}
+
+.details-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 2rem clamp(1.25rem, 4vw, 3rem) 3rem;
+}
+
+.section-kicker {
+  color: #c94f24;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.details-lower h2 {
+  margin: 0.45rem 0 0.75rem;
+  font-size: 1.5rem;
+}
+
+.overview {
+  margin-bottom: 1.4rem;
+  color: #77716d;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.film-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.film-facts div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.film-facts span {
+  color: #89817a;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.film-facts strong {
+  font-size: 0.82rem;
+}
+
+.cast-grid,
+.recommendations-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.cast-member {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.cast-photo {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e2ded3;
+}
+
+.cast-photo-fallback {
+  display: grid;
+  place-items: center;
+  color: #7c442d;
+  font-family: serif;
+  font-size: 1.2rem;
+}
+
+.cast-credit,
+.recommendation-item > div {
+  min-width: 0;
+}
+
+.cast-credit h3,
+.recommendation-item h3 {
+  overflow: hidden;
+  margin: 0 0 0.2rem;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cast-credit p,
+.cast-empty,
+.recommendation-item p,
+.recommendations-message {
+  color: #817a74;
+  font-size: 0.72rem;
+}
+
+.recommendation-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.recommendation-item img {
+  width: 58px;
+  height: 78px;
+  object-fit: cover;
+}
+
+.recommendation-item strong {
+  display: inline-block;
+  margin-top: 0.25rem;
+  color: #af7622;
+  font-size: 0.75rem;
+}
+
+.recommendation-item:hover h3 {
+  color: #b64a27;
+  text-decoration: underline;
 }
 
 .loading {
-  text-align: center;
   padding: 5rem;
-  font-size: 1.2rem;
   color: #666;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .hero-layout {
+    grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+  }
+
+  .details-lower {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .synopsis-column {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .film-hero {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .hero-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .details-poster {
+    width: min(190px, 55vw);
+  }
+
+  .details-lower {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .synopsis-column {
+    grid-column: auto;
+  }
+
 }
 </style>

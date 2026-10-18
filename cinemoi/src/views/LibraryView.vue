@@ -23,7 +23,6 @@
             </div>
         </div>
 
-    <!-- filtrage (all, favorites, watched, to watch) -->
     <div class="tabs-row">
         <button 
             v-for="tab in tabs" 
@@ -35,7 +34,6 @@
         </button>
     </div>
 
-    <!-- barre de recherche-->
     <div class="filter-toolbar">
     <div class="search-box-container">
       <SearchBar 
@@ -45,7 +43,6 @@
     </div>
   </div>
 
-    <!--grille des films -->
     <div class="movies-grid" v-if="filteredLibrary.length > 0">
       <div class="library-movie-card" v-for="movie in filteredLibrary" :key="movie.id" @click="goToDetails(movie.id)">
         <div class="poster-container">
@@ -63,8 +60,6 @@
         </div>
       </div>
     </div>
-
-    <!-- message si pas de films /vide -->
     <div v-else class="empty-state">
       <p>Aucun film trouvé dans cette section de votre bibliothèque.</p>
     </div>
@@ -72,6 +67,11 @@
 </template>
 
 <script setup>
+/* Filtrage : tous, favoris, vus ou à voir. */
+/* Barre de recherche de la bibliothèque. */
+/* Grille des films filtrés. */
+/* Message affiché quand aucun film ne correspond. */
+
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
@@ -123,6 +123,8 @@ const filteredLibrary = computed(() => {
 
   return result;
 });
+
+// TODO: ajouter un filtre de genres dans la bibliothèque et le combiner aux onglets et à la recherche existants.
 
 const formatStatus = (status) => {
   if (status === 'watched') return 'Vu';

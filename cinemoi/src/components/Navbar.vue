@@ -11,7 +11,7 @@
     <nav class="navbar-center">
       <router-link to="/" class="nav-item">Découvrir</router-link>
       <router-link to="/library" class="nav-item">Ma bibliothèque</router-link>
-      <router-link to="/favorites" class="nav-item">Listes</router-link>
+      <router-link to="/lists" class="nav-item">Listes</router-link>
     </nav>
 
     <div class="navbar-right">
@@ -145,5 +145,38 @@
 .dropdown-arrow {
   font-size: 0.65rem;
   color: #666;
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .navbar-left,
+  .navbar-right {
+    flex: 0 0 auto;
+  }
+
+  .navbar-right {
+    gap: 0.8rem;
+  }
+
+  .navbar-center {
+    order: 1;
+    flex: 0 0 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .nav-item {
+    font-size: 0.82rem;
+  }
+
+  .profile-name,
+  .dropdown-arrow {
+    display: none;
+  }
 }
 </style> 

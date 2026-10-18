@@ -3,6 +3,7 @@
       <div class="poster-container">
         <img :src="movie.poster" :alt="movie.title" @click="goToDetails" />
         
+        <!-- TODO: colorer le cœur en rouge si le film est favori, et le remettre blanc au second clic. -->
         <button class="favorite-btn" @click.stop="toggleFav">♥</button>
 
         <button class="add-btn" @click.stop="quickAddToLibrary">+</button>
@@ -27,7 +28,7 @@ const props = defineProps({
 const store = useStore();
 const router = useRouter();
 
-// Ajout rapide depuis la carte (ex: met en statut 'to-watch' par défaut)
+// ajout rapide depuis la carte 
 const quickAddToLibrary = () => {
   store.commit('ADD_TO_LIBRARY', { 
     movie: props.movie, 
@@ -37,9 +38,7 @@ const quickAddToLibrary = () => {
 };
 
 const toggleFav = () => {
-  // Optionnel : gérer les favoris dans le store
-  const updatedMovie = { ...props.movie, isFavorite: !props.movie.isFavorite };
-  store.commit('ADD_TO_LIBRARY', { movie: updatedMovie, status: updatedMovie.status || 'to-watch' });
+  store.commit('TOGGLE_FAVORITE', props.movie);
 };
 
 const goToDetails = () => {
