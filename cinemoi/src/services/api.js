@@ -5,6 +5,9 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 function mapMovie(movie) {
     const genreIds = movie.genre_ids || [];
 
+    // On transforme tous les IDs de genres du film en un tableau de mots (ex: ['Action', 'Science-Fiction'])
+    const genresList = genreIds.map(id => genreIdToString(id));
+
     return {
         id: movie.id,
         title: movie.title,
@@ -14,7 +17,8 @@ function mapMovie(movie) {
         year: movie.release_date ? movie.release_date.split('-')[0] : 'Inconnue',
         rating: movie.vote_average ? movie.vote_average.toFixed(1) : '0.0',
         genreIds,
-        genre: genreIdToString(genreIds[0])
+        genres: genresList, // Tableau de tous les genres du film
+        genre: genresList[0] || 'Film' // Le genre principal pour l'affichage rapide
     };
 }
 
@@ -45,10 +49,26 @@ export async function getPopularMovies() {
     }
 }
 
+export async function getMovieGenres() {
+    try {
+        const params = new URLSearchParams({
+            api_key: API_KEY,
+            language: 'fr-FR'
+        });
+        const response = await fetch(`${BASE_URL}/genre/movie/list?${params}`);
+        const data = await response.json();
+
+        return data.genres || [];
+    } catch (error) {
+        console.error('Erreur API des genres :', error);
+        return [];
+    }
+}
+
 export async function searchMovies(query) {
     if (!query || query.trim() === '') {
         return [];
-}
+    }
 
     try {
         const params = new URLSearchParams({
@@ -64,4 +84,26 @@ export async function searchMovies(query) {
         console.error('Erreur API de recherche :', error);
         return [];
     }
+}
+// recup les infos avec l'id
+export async function getMovieDetails(movieId) {
+  try {
+    const response = await fetch(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=fr-FR`);
+    const data = await response.json();
+    
+    return {
+      id: data.id,
+      title: data.title,
+      poster: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : 'https://via.placeholder.com/300x400?text=Pas+d%27affiche',
+      backdrop: data.backdrop_path ? `https://image.tmdb.org/t/p/original${data.backdrop_path}` : '',
+      year: data.release_date ? data.release_date.split('-')[0] : 'Inconnue',
+      rating: data.vote_average ? data.vote_average.toFixed(1) : '0.0',
+      overview: data.overview || "Aucun synopsis disponible.",
+      runtime: data.runtime ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}min` : 'Durée inconnue',
+      genres: data.genres ? data.genres.map(g => g.name).join(', ') : ''
+    };
+  } catch (error) {
+    console.error("Erreur API détails du film :", error);
+    return null;
+  }
 }

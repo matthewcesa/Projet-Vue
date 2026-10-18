@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <!-- Section "À l'affiche" avec filtres par genre -->
+
     <section class="movies-section">
       <div class="section-header">
         <div>
@@ -33,19 +33,25 @@
         <router-link to="/library" class="see-all-link">Voir tous les films →</router-link>
       </div>
 
-      <!-- Filtres par genre -->
+
       <div class="filters-row">
-        <button 
-          v-for="category in categories" 
-          :key="category" 
-          :class="['filter-pill', { active: selectedCategory === category }]"
-          @click="selectedCategory = category"
+        <button
+          :class="['filter-pill', { active: selectedGenreId === null }]"
+          @click="selectedGenreId = null"
         >
-          {{ category }}
+          Tous
+        </button>
+        <button
+          v-for="genre in genres"
+          :key="genre.id"
+          :class="['filter-pill', { active: selectedGenreId === genre.id }]"
+          @click="selectedGenreId = genre.id"
+        >
+          {{ genre.name }}
         </button>
       </div>
 
-      <!-- Grille filtrée dynamiquement -->
+   
       <div class="movies-grid">
         <MovieCard 
           v-for="movie in filteredMovies" 
@@ -56,7 +62,7 @@
         />
       </div>
 
-      <!-- Message si le filtre ne donne rien -->
+
       <p v-if="filteredMovies.length === 0" class="no-results">
         Aucun film trouvé pour cette catégorie.
       </p>
@@ -68,33 +74,39 @@
 import { ref, computed, onMounted } from 'vue';
 import SearchBar from '../components/SearchBar.vue';
 import MovieCard from '../components/MovieCards.vue';
-import { getPopularMovies, searchMovies } from '../services/api.js';
+import { getMovieGenres, getPopularMovies, searchMovies } from '../services/api.js';
 
 const searchQuery = ref('');
 const movies = ref([]);
-const selectedCategory = ref('Tous');
-const categories = ['Tous', 'Drame', 'Comédie', 'Thriller', 'Romance', 'Documentaire', 'Animation', 'Action'];
+const genres = ref([]);
+const selectedGenreId = ref(null);
 
-// Charger les meilleurs films populaires dès l'ouverture de la page
+
 onMounted(async () => {
-  movies.value = await getPopularMovies();
+  const [movieGenres, popularMovies] = await Promise.all([
+    getMovieGenres(),
+    getPopularMovies()
+  ]);
+
+  genres.value = movieGenres;
+  movies.value = popularMovies;
 });
 
-// Gérer la recherche textuelle
+
 const handleSearch = async () => {
   if (searchQuery.value.length > 2) {
     movies.value = await searchMovies(searchQuery.value);
   } else if (searchQuery.value.length === 0) {
-    movies.value = await getPopularMovies(); // Remet les populaires si on efface la recherche
+    movies.value = await getPopularMovies(); 
   }
 };
 
-// Filtrer les films affichés en fonction du genre cliqué
 const filteredMovies = computed(() => {
-  if (selectedCategory.value === 'Tous') {
+  if (selectedGenreId.value === null) {
     return movies.value;
   }
-  return movies.value.filter(movie => movie.genre === selectedCategory.value);
+
+  return movies.value.filter(movie => movie.genreIds.includes(selectedGenreId.value));
 });
 
 const addToLibrary = (movie) => {

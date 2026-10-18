@@ -1,39 +1,50 @@
 <template>
-  <div class="movie-card">
-    <div class="poster-container">
-      <img :src="movie.poster" :alt="movie.title" />
-      
-      <span v-if="movie.badge" class="badge">{{ movie.badge }}</span>
+    <div class="movie-card">
+      <div class="poster-container">
+        <img :src="movie.poster" :alt="movie.title" @click="goToDetails" />
+        
+        <button class="favorite-btn" @click.stop="toggleFav">♥</button>
 
-      <button class="favorite-btn" @click="$emit('toggle-favorite', movie)">
-        ♥
-      </button>
-
-      <button class="add-btn" @click="$emit('add-to-library', movie)">
-        +
-      </button>
-
-      <div class="rating">
-        ⭐ {{ movie.rating }}
+        <button class="add-btn" @click.stop="quickAddToLibrary">+</button>
+        
+        <div class="rating">{{ movie.rating }}</div>
+      </div>
+      <div class="movie-info" @click="goToDetails">
+        <h3>{{ movie.title }}</h3>
+        <p>{{ movie.genre }} · {{ movie.year }}</p>
       </div>
     </div>
-
-    <div class="movie-info">
-      <h3>{{ movie.title }}</h3>
-      <p>{{ movie.genre }} · {{ movie.year }} · {{ movie.duration }}</p>
-    </div>
-  </div>
 </template>
 
 <script setup>
-defineProps({
-  movie: {
-    type: Object,
-    required: true
-  }
+import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
+
+const props = defineProps({
+  movie: { type: Object, required: true }
 });
 
-defineEmits(['add-to-library', 'toggle-favorite']);
+const store = useStore();
+const router = useRouter();
+
+// Ajout rapide depuis la carte (ex: met en statut 'to-watch' par défaut)
+const quickAddToLibrary = () => {
+  store.commit('ADD_TO_LIBRARY', { 
+    movie: props.movie, 
+    status: 'to-watch' 
+  });
+  console.log("Ajouté à la bibliothèque :", props.movie.title);
+};
+
+const toggleFav = () => {
+  // Optionnel : gérer les favoris dans le store
+  const updatedMovie = { ...props.movie, isFavorite: !props.movie.isFavorite };
+  store.commit('ADD_TO_LIBRARY', { movie: updatedMovie, status: updatedMovie.status || 'to-watch' });
+};
+
+const goToDetails = () => {
+  router.push({ name: 'details', params: { id: props.movie.id } });
+};
 </script>
 
 <style scoped>
