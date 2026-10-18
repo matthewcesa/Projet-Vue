@@ -3,10 +3,19 @@
     <header class="catalogue-header">
       <div>
         <span class="subtitle-tag">CINÉMOI · CATALOGUE</span>
-        <h1>{{ selectedGenreName ? `Films : ${selectedGenreName}` : 'Tous les films populaires' }}</h1>
+        <h1>{{ catalogueTitle }}</h1>
       </div>
       <p v-if="!loading && movies.length">{{ movies.length }} films</p>
     </header>
+
+    <div class="catalogue-search-wrapper">
+      <SearchBar
+        v-model="searchQuery"
+        placeholder="Titre, acteur, réalisateur, genre, année (ex: 2014)..."
+        @submit="runSearch" 
+      />
+      <p class="search-hint">Exemples : Interstellar, Christopher Nolan, Action, 2014 (Appuie sur Entrée)</p>
+    </div>
 
     <div class="genres-row" aria-label="Filtrer le catalogue par genre">
       <button
@@ -41,7 +50,6 @@
     <p v-else class="catalogue-message">Aucun film n’a été trouvé.</p>
 
     <button
-
       v-if="!loading && hasMore"
       class="load-more-button"
       type="button"
@@ -54,12 +62,14 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import MovieCard from '../components/MovieCards.vue';
-import { getMovieGenres, getMoviesByGenre, getPopularMovies } from '../services/api.js';
+import { getMovieGenres, searchCatalogue } from '../services/api.js';
+import SearchBar from '../components/SearchBar.vue';
 
 const movies = ref([]);
 const genres = ref([]);
+const searchQuery = ref('');
 const loading = ref(true);
 const loadingMore = ref(false);
 const hasMore = ref(true);
@@ -70,63 +80,64 @@ const selectedGenreName = ref('');
 const error = ref('');
 let requestId = 0;
 
-onMounted(async () => {
-  const [movieGenres, firstPage] = await Promise.all([
-    getMovieGenres(),
-    getPopularMovies(page.value)
-  ]);
+const catalogueTitle = computed(() => {
+  if (searchQuery.value.trim()) return `Résultats : ${searchQuery.value.trim()}`;
+  return selectedGenreName.value ? `Films : ${selectedGenreName.value}` : 'Tous les films populaires';
+});
 
+onMounted(async () => {
+  const [movieGenres] = await Promise.all([getMovieGenres()]);
   genres.value = movieGenres;
-  movies.value = firstPage;
-  if (movies.value.length === 0) {
-    error.value = 'Impossible de charger les films. Vérifie la connexion à l’API.';
-    hasMore.value = false;
-  } else if (movies.value.length < 20) {
-    hasMore.value = false;
-  }
-  loading.value = false;
+  await runSearch();
 });
 
 const selectGenre = async (genreId) => {
   selectedGenreId.value = genreId;
   selectedGenreName.value = genres.value.find(genre => genre.id === genreId)?.name || '';
+  await runSearch();
+};
+
+// Fonction de recherche propre qui utilise searchCatalogue
+const runSearch = async () => {
   page.value = 1;
-  totalPages.value = 500;
   hasMore.value = false;
   error.value = '';
   loading.value = true;
   const currentRequestId = ++requestId;
 
-  if (genreId === null) {
-    const firstPage = await getPopularMovies(1);
-    if (currentRequestId !== requestId) return;
-    movies.value = firstPage;
-    hasMore.value = firstPage.length === 20;
-  } else {
-    const result = await getMoviesByGenre(genreId, 1);
-    if (currentRequestId !== requestId) return;
-    movies.value = result.movies;
-    totalPages.value = result.totalPages;
-    hasMore.value = page.value < totalPages.value;
-  }
+  const result = await searchCatalogue({
+    query: searchQuery.value,
+    genreId: selectedGenreId.value,
+    genres: genres.value,
+    page: page.value
+  });
 
-  if (currentRequestId === requestId) {
-    loading.value = false;
-    if (movies.value.length === 0) {
-      error.value = 'Aucun film trouvé pour ce genre.';
-    }
+  if (currentRequestId !== requestId) return;
+
+  movies.value = result.movies;
+  totalPages.value = result.totalPages;
+  hasMore.value = page.value < totalPages.value;
+  loading.value = false;
+
+  if (result.error) {
+    error.value = 'La recherche a échoué. Vérifie ta connexion puis réessaie.';
+  } else if (movies.value.length === 0) {
+    error.value = 'Aucun résultat trouvé. Essaie un autre titre, nom, genre ou année.';
   }
 };
 
 const loadMoreMovies = async () => {
-  if (loadingMore.value || !hasMore.value) return;
+  if (loadingMore.value || loading.value || !hasMore.value) return;
 
   loadingMore.value = true;
   const nextPage = page.value + 1;
   const currentRequestId = ++requestId;
-  const nextResult = selectedGenreId.value === null
-    ? { movies: await getPopularMovies(nextPage), totalPages: 500 }
-    : await getMoviesByGenre(selectedGenreId.value, nextPage);
+  const nextResult = await searchCatalogue({
+    query: searchQuery.value,
+    genreId: selectedGenreId.value,
+    genres: genres.value,
+    page: nextPage
+  });
 
   if (currentRequestId !== requestId) return;
 
@@ -134,11 +145,13 @@ const loadMoreMovies = async () => {
   page.value = nextPage;
   totalPages.value = nextResult.totalPages;
   hasMore.value = nextResult.movies.length === 20 && page.value < totalPages.value;
+  if (nextResult.error) error.value = 'Impossible de charger plus de résultats.';
   loadingMore.value = false;
 };
 </script>
 
 <style scoped>
+/* Conserve exactement tes styles actuels */
 .catalogue-view {
   min-height: calc(100vh - 70px);
   max-width: 1400px;
@@ -171,6 +184,17 @@ h1 {
 .catalogue-header p,
 .catalogue-message {
   color: #666;
+}
+
+.catalogue-search-wrapper {
+  max-width: 760px;
+  margin-bottom: 1.5rem;
+}
+
+.search-hint {
+  margin-top: 0.4rem;
+  color: #817a74;
+  font-size: 0.72rem;
 }
 
 .genres-row {

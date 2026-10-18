@@ -1,11 +1,7 @@
 <template>
   <div class="search-container">
-    <input 
-      type="text" 
-      :value="modelValue" 
-      @input="$emit('update:modelValue', $event.target.value)" 
-      :placeholder="placeholder" 
-    />
+    <input type="text" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)"
+      @keyup.enter="$emit('submit')" :placeholder="placeholder" />
     <span v-if="shortcut" class="kbd-shortcut">{{ shortcut }}</span>
   </div>
 </template>
@@ -22,7 +18,7 @@ defineProps({
   }
 });
 
-defineEmits(['update:modelValue']);
+defineEmits(['update:modelValue', 'submit']);
 </script>
 
 <style scoped>

@@ -99,6 +99,94 @@ export async function getMoviesByGenre(genreId, page = 1) {
     }
 }
 
+export async function searchCatalogue({ query = '', genreId = null, genres = [], page = 1 } = {}) {
+    const normalizedQuery = query.trim();
+    const normalizedForMatch = normalizedQuery
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('fr-FR');
+    const matchingGenre = genres.find(genre => genre.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('fr-FR') === normalizedForMatch);
+    const selectedGenres = [genreId, matchingGenre?.id].filter((id, index, ids) =>
+        id !== null && id !== undefined && ids.indexOf(id) === index
+    );
+    const yearMatch = normalizedQuery.match(/\b(18\d{2}|19\d{2}|20\d{2}|2100)\b/);
+
+    try {
+        const makeParams = values => new URLSearchParams({
+            api_key: API_KEY,
+            language: 'fr-FR',
+            page: String(page),
+            ...values
+        });
+        const fetchDiscover = async values => {
+            const response = await fetch(`${BASE_URL}/discover/movie?${makeParams(values)}`);
+            if (!response.ok) throw new Error(`TMDB a répondu avec le statut ${response.status}`);
+            return response.json();
+        };
+
+        // Une année et/ou un genre se recherchent directement avec l'endpoint discover.
+        if (!normalizedQuery || yearMatch || selectedGenres.length > 0 && matchingGenre) {
+            const params = {};
+            if (selectedGenres.length) params.with_genres = selectedGenres.join(',');
+            if (yearMatch) params.primary_release_year = yearMatch[0];
+            if (!selectedGenres.length && !yearMatch) params.sort_by = 'popularity.desc';
+            const data = await fetchDiscover(params);
+            return {
+                movies: (data.results || []).map(mapMovie),
+                totalPages: Math.min(data.total_pages || 0, 500)
+            };
+        }
+
+        // TMDB distingue le texte d'un titre et les personnes: on interroge les deux.
+        const queryParams = new URLSearchParams({
+            api_key: API_KEY,
+            language: 'fr-FR',
+            query: normalizedQuery,
+            page: String(page)
+        });
+        const [movieResponse, peopleResponse] = await Promise.all([
+            fetch(`${BASE_URL}/search/movie?${queryParams}`),
+            fetch(`${BASE_URL}/search/person?${queryParams}`)
+        ]);
+        if (!movieResponse.ok || !peopleResponse.ok) {
+            throw new Error('TMDB n’a pas pu effectuer la recherche.');
+        }
+
+        const [movieData, peopleData] = await Promise.all([
+            movieResponse.json(),
+            peopleResponse.json()
+        ]);
+        const matchingPerson = peopleData.results?.[0];
+        let peopleMovies = [];
+        let peopleTotalPages = 0;
+
+        if (matchingPerson) {
+            const peopleFilters = { with_people: String(matchingPerson.id) };
+            if (selectedGenres.length) peopleFilters.with_genres = selectedGenres.join(',');
+            const peopleDataResults = await fetchDiscover(peopleFilters);
+            peopleMovies = peopleDataResults.results || [];
+            peopleTotalPages = Math.min(peopleDataResults.total_pages || 0, 500);
+        }
+
+        const titleMovies = (movieData.results || []).filter(movie =>
+            !selectedGenres.length || selectedGenres.every(id => (movie.genre_ids || []).includes(id))
+        );
+        const mergedMovies = [...titleMovies, ...peopleMovies]
+            .filter((movie, index, allMovies) => allMovies.findIndex(item => item.id === movie.id) === index);
+
+        return {
+            movies: mergedMovies.map(mapMovie),
+            totalPages: Math.min(Math.max(movieData.total_pages || 0, peopleTotalPages), 500)
+        };
+    } catch (error) {
+        console.error('Erreur de recherche dans le catalogue :', error);
+        return { movies: [], totalPages: 0, error: error.message };
+    }
+}
+
 export async function getMovieGenres() {
     try {
         const params = new URLSearchParams({
@@ -193,6 +281,8 @@ export async function getMovieDetails(movieId) {
       rating: data.vote_average ? data.vote_average.toFixed(1) : '0.0',
       overview: data.overview || "Aucun synopsis disponible.",
       runtime: data.runtime ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}min` : 'Durée inconnue',
+    runtimeMinutes: data.runtime || null,
+    runtimeMinutes: data.runtime || null,
     genreIds: (data.genres || []).map(genre => genre.id),
             genres: data.genres ? data.genres.map(g => g.name).join(', ') : '',
             cast: (data.credits?.cast || []).slice(0, 10).map(person => ({
