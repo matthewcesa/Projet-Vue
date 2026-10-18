@@ -43,6 +43,22 @@
               </button>
             </div>
           </div>
+
+          <form class="review-panel" @submit.prevent="saveReview">
+            <h2>Votre critique</h2>
+            <p>Gardez une trace de ce que ce film vous a fait ressentir.</p>
+            <textarea
+              v-model="reviewText"
+              maxlength="1000"
+              placeholder="Votre avis sur ce film..."
+              aria-label="Votre critique du film"
+            ></textarea>
+            <div class="review-footer">
+              <span>{{ reviewText.length }} / 1000</span>
+              <button class="review-save-button" type="submit">Enregistrer</button>
+            </div>
+            <p v-if="reviewSaved" class="saved-message" role="status">Critique enregistrée</p>
+          </form>
         </div>
       </div>
     </section>
@@ -125,6 +141,8 @@ const movie = ref(null);
 const recommendedMovies = ref([]);
 const recommendationsLoading = ref(false);
 const personalRating = ref(0);
+const reviewText = ref('');
+const reviewSaved = ref(false);
 
 const isFavorite = computed(() =>
   store.state.library.some(item => item.id === movie.value?.id && item.isFavorite)
@@ -134,7 +152,11 @@ watch(() => route.params.id, async (movieId) => {
   movie.value = null;
   recommendedMovies.value = [];
   recommendationsLoading.value = false;
-  personalRating.value = loadPersonalRating(movieId);
+  reviewSaved.value = false;
+
+  const savedReview = loadReview(movieId);
+  personalRating.value = savedReview.rating;
+  reviewText.value = savedReview.text;
 
   const movieDetails = await getMovieDetails(movieId);
   movie.value = movieDetails;
@@ -147,27 +169,55 @@ watch(() => route.params.id, async (movieId) => {
   }
 }, { immediate: true });
 
-function loadPersonalRating(movieId) {
+function loadReview(movieId) {
   try {
-    const savedRating = Number(localStorage.getItem(`cinemoi_rating_${movieId}`));
-    return Number.isInteger(savedRating) && savedRating >= 1 && savedRating <= 5
-      ? savedRating
-      : 0;
+    const savedReview = localStorage.getItem(`cinemoi_review_${movieId}`);
+    if (savedReview) {
+      const parsedReview = JSON.parse(savedReview);
+      return {
+        rating: Number.isInteger(parsedReview.rating) && parsedReview.rating >= 1 && parsedReview.rating <= 5
+          ? parsedReview.rating
+          : 0,
+        text: typeof parsedReview.text === 'string' ? parsedReview.text : ''
+      };
+    }
+
+    // Reprendre les notes créées avant que la critique soit ajoutée.
+    const legacyRating = Number(localStorage.getItem(`cinemoi_rating_${movieId}`));
+    return {
+      rating: Number.isInteger(legacyRating) && legacyRating >= 1 && legacyRating <= 5
+        ? legacyRating
+        : 0,
+      text: ''
+    };
   } catch (error) {
-    console.error('Impossible de charger la note personnelle :', error);
-    return 0;
+    console.error('Impossible de charger la critique et la note :', error);
+    return { rating: 0, text: '' };
+  }
+}
+
+function persistReview() {
+  if (!movie.value) return false;
+
+  try {
+    localStorage.setItem(`cinemoi_review_${movie.value.id}`, JSON.stringify({
+      rating: personalRating.value,
+      text: reviewText.value
+    }));
+    return true;
+  } catch (error) {
+    console.error('Impossible de sauvegarder la critique et la note :', error);
+    return false;
   }
 }
 
 const savePersonalRating = (rating) => {
-  if (!movie.value) return;
+  personalRating.value = rating;
+  persistReview();
+};
 
-  try {
-    localStorage.setItem(`cinemoi_rating_${movie.value.id}`, String(rating));
-    personalRating.value = rating;
-  } catch (error) {
-    console.error('Impossible de sauvegarder la note personnelle :', error);
-  }
+const saveReview = () => {
+  reviewSaved.value = persistReview();
 };
 
 const updateStatus = (status) => {
@@ -237,7 +287,7 @@ const toggleFavorite = () => {
 
 .hero-layout {
   display: grid;
-  grid-template-columns: minmax(170px, 240px) minmax(0, 1fr);
+  grid-template-columns: minmax(170px, 240px) minmax(0, 1fr) minmax(250px, 320px);
   align-items: start;
   gap: clamp(1.5rem, 3vw, 2.5rem);
 }
@@ -313,8 +363,9 @@ const toggleFavorite = () => {
 .personal-rating {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  margin: 1.2rem 0;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
   font-size: 0.82rem;
 }
 
@@ -339,6 +390,67 @@ const toggleFavorite = () => {
 
 .rating-value {
   color: #e5ae36;
+}
+
+.review-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 275px;
+  padding: 1.25rem;
+  background: #f8f4ed;
+  color: #292522;
+}
+
+.review-panel h2 {
+  margin: 0 0 0.4rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.45rem;
+}
+
+.review-panel > p {
+  margin: 0 0 0.8rem;
+  color: #77716d;
+  font-size: 0.84rem;
+}
+
+.review-panel textarea {
+  width: 100%;
+  min-height: 110px;
+  flex: 1;
+  padding: 0.8rem;
+  resize: vertical;
+  border: 1px solid #d8cfc1;
+  background: #f5efe4;
+  color: #292522;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+  color: #77716d;
+  font-size: 0.72rem;
+}
+
+.review-save-button {
+  min-height: 36px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid #c94f24;
+  background: #c94f24;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.review-panel .saved-message {
+  margin: 0.5rem 0 0;
+  color: #35764a;
 }
 
 .btn-secondary {
@@ -504,6 +616,10 @@ const toggleFavorite = () => {
     grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
   }
 
+  .review-panel {
+    grid-column: 2;
+  }
+
   .details-lower {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -523,6 +639,10 @@ const toggleFavorite = () => {
     gap: 1.25rem;
   }
 
+  .review-panel {
+    grid-column: auto;
+  }
+
   .details-poster {
     width: min(190px, 55vw);
   }
@@ -531,10 +651,6 @@ const toggleFavorite = () => {
     grid-template-columns: 1fr;
     gap: 1.75rem;
     padding: 1.5rem 1rem 2rem;
-  }
-
-  .personal-rating {
-    flex-wrap: wrap;
   }
 
   .synopsis-column {
