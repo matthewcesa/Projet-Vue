@@ -148,13 +148,13 @@ const isFavorite = computed(() =>
   store.state.library.some(item => item.id === movie.value?.id && item.isFavorite)
 );
 
-watch(() => route.params.id, async (movieId) => {
+watch(() => [route.params.id, store.state.user?.id], async ([movieId]) => {
   movie.value = null;
   recommendedMovies.value = [];
   recommendationsLoading.value = false;
   reviewSaved.value = false;
 
-  const savedReview = loadReview(movieId);
+  const savedReview = store.state.reviews[movieId] || { rating: 0, text: '' };
   personalRating.value = savedReview.rating;
   reviewText.value = savedReview.text;
 
@@ -169,44 +169,18 @@ watch(() => route.params.id, async (movieId) => {
   }
 }, { immediate: true });
 
-function loadReview(movieId) {
-  try {
-    const savedReview = localStorage.getItem(`cinemoi_review_${movieId}`);
-    if (savedReview) {
-      const parsedReview = JSON.parse(savedReview);
-      return {
-        rating: Number.isInteger(parsedReview.rating) && parsedReview.rating >= 1 && parsedReview.rating <= 5
-          ? parsedReview.rating
-          : 0,
-        text: typeof parsedReview.text === 'string' ? parsedReview.text : ''
-      };
-    }
-
-    // Reprendre les notes créées avant que la critique soit ajoutée.
-    const legacyRating = Number(localStorage.getItem(`cinemoi_rating_${movieId}`));
-    return {
-      rating: Number.isInteger(legacyRating) && legacyRating >= 1 && legacyRating <= 5
-        ? legacyRating
-        : 0,
-      text: ''
-    };
-  } catch (error) {
-    console.error('Impossible de charger la critique et la note :', error);
-    return { rating: 0, text: '' };
-  }
-}
-
 function persistReview() {
   if (!movie.value) return false;
 
   try {
-    localStorage.setItem(`cinemoi_review_${movie.value.id}`, JSON.stringify({
+    store.commit('SET_MOVIE_REVIEW', {
+      movieId: movie.value.id,
       rating: personalRating.value,
       text: reviewText.value
-    }));
+    });
     return true;
   } catch (error) {
-    console.error('Impossible de sauvegarder la critique et la note :', error);
+    console.error('Impossible de sauvegarder la critique et la note dans le compte :', error);
     return false;
   }
 }

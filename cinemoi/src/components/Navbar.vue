@@ -8,13 +8,13 @@
       </router-link>
     </div>
 
-    <nav class="navbar-center">
+    <nav v-if="user" class="navbar-center">
       <router-link to="/" class="nav-item">Découvrir</router-link>
       <router-link to="/library" class="nav-item">Ma bibliothèque</router-link>
       <router-link to="/lists" class="nav-item">Listes</router-link>
     </nav>
 
-    <div class="navbar-right">
+    <div v-if="user" class="navbar-right">
       <button class="notification-btn" aria-label="Notifications">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -22,14 +22,28 @@
         </svg>
       </button>
 
-      <router-link to="/login" class="profile-link">
-        <img src="https://via.placeholder.com/40" alt="Avatar" class="avatar" />
-        <span class="profile-name">Élisa</span>
-        <span class="dropdown-arrow">▼</span>
-      </router-link>
+      <span class="profile-name">{{ user.email }}</span>
+      <button class="logout-button" type="button" @click="logout">Déconnexion</button>
     </div>
+
+    <router-link v-else to="/login" class="login-link">Connexion / Inscription</router-link>
   </header>
 </template>
+
+<script setup>
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
+
+const store = useStore();
+const router = useRouter();
+const user = computed(() => store.state.user);
+
+const logout = async () => {
+  await store.dispatch('logout');
+  router.push({ name: 'login' });
+};
+</script>
 
 <style scoped>
 .navbar {
@@ -135,6 +149,18 @@
   font-size: 0.95rem;
 }
 
+.logout-button,
+.login-link {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #b85d38;
+  background: transparent;
+  color: #8f4528;
+  font: inherit;
+  font-size: 0.82rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .avatar {
   width: 32px;
   height: 32px;
@@ -174,8 +200,14 @@
     font-size: 0.82rem;
   }
 
-  .profile-name,
-  .dropdown-arrow {
+  .profile-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .notification-btn {
     display: none;
   }
 }

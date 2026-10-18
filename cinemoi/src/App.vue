@@ -1,8 +1,7 @@
 <template>
-  <div id="app">
-    <Navbar />
+  <div id="app" :class="{ 'auth-app': route.name === 'login' }">
+    <Navbar v-if="route.name !== 'login'" />
 
-  
     <main class="main-content">
       <router-view />
     </main>
@@ -10,7 +9,10 @@
 </template>
 
 <script setup>
+import { useRoute } from 'vue-router';
 import Navbar from './components/Navbar.vue';
+
+const route = useRoute();
 </script>
 
 <style>
@@ -28,5 +30,9 @@ body {
 
 .main-content {
   min-height: calc(100vh - 70px); 
+}
+
+.auth-app .main-content {
+  min-height: 100vh;
 }
 </style>
