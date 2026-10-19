@@ -7,12 +7,14 @@
           <span class="films-count">12 846 FILMS DISPONIBLES</span>
           <h1>Quel film vous fera vibrer ce soir ?</h1>
           
-          <SearchBar 
-            v-model="searchQuery" 
-            placeholder="Rechercher un titre, un cinéaste, un acteur..." 
-            shortcut="⌘ K" 
-            @update:model-value="handleSearch"
-          />
+          <div class="hero-search">
+            <SearchBar
+              v-model="searchQuery"
+              placeholder="Rechercher un titre, un cinéaste, un acteur..."
+              shortcut="⌘ K"
+              @update:model-value="handleSearch"
+            />
+          </div>
         </div>
 
         <div class="hero-card-right">
@@ -42,8 +44,6 @@
           v-for="movie in movies" 
           :key="movie.id" 
           :movie="movie"
-          @add-to-library="addToLibrary"
-          @toggle-favorite="toggleFavorite"
         />
       </div>
 
@@ -100,13 +100,6 @@ const handleSearch = async (query = searchQuery.value) => {
   }
 };
 
-const addToLibrary = (movie) => {
-  console.log("Ajouté à la bibliothèque :", movie.title);
-};
-
-const toggleFavorite = (movie) => {
-  console.log("Favori basculé pour :", movie.title);
-};
 </script>
 
 <style scoped>
@@ -262,5 +255,127 @@ const toggleFavorite = (movie) => {
   margin-top: 2rem;
   color: #666;
   font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .hero-banner {
+    padding: 3rem 1.5rem;
+  }
+
+  .hero-content {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .hero-left {
+    width: 100%;
+  }
+
+  .hero-left h1 {
+    max-width: 16ch;
+    font-size: clamp(2rem, 6vw, 2.6rem);
+  }
+
+  .hero-search,
+  .hero-search :deep(.search-container) {
+    width: 100%;
+    max-width: none;
+  }
+
+  .hero-card-right {
+    max-width: none;
+  }
+
+  .movies-section {
+    margin-top: 2.25rem;
+    padding: 0 1.5rem;
+  }
+
+  .movies-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-columns: unset;
+    grid-auto-flow: row;
+    gap: 1.25rem;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-banner {
+    padding: 2.25rem 1rem;
+    background-position: center;
+  }
+
+  .hero-content {
+    gap: 1.25rem;
+  }
+
+  .films-count {
+    font-size: 0.68rem;
+  }
+
+  .hero-left h1 {
+    max-width: 14ch;
+    margin: 0.65rem 0 1.1rem;
+    font-size: clamp(1.8rem, 8vw, 2.25rem);
+    line-height: 1.12;
+  }
+
+  .hero-search :deep(.search-container input) {
+    min-width: 0;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .hero-search :deep(.kbd-shortcut) {
+    display: none;
+  }
+
+  .hero-card-right {
+    padding: 1.15rem;
+    border-radius: 12px;
+  }
+
+  .hero-card-right h2 {
+    font-size: 1.2rem;
+  }
+
+  .hero-card-right p {
+    font-size: 0.82rem;
+  }
+
+  .movies-section {
+    margin-top: 1.75rem;
+    padding: 0 1rem;
+  }
+
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .section-header h2 {
+    font-size: clamp(1.45rem, 6vw, 1.8rem);
+    line-height: 1.15;
+  }
+
+  .see-all-link {
+    font-size: 0.85rem;
+  }
+
+  .movies-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .movies-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

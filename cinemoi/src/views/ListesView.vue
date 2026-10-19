@@ -154,8 +154,7 @@ const loadMoreMovies = async () => {
 /* Conserve exactement tes styles actuels */
 .catalogue-view {
   min-height: calc(100vh - 70px);
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
   padding: 3rem clamp(1.25rem, 5vw, 4rem);
   background-color: #fcf9f2;
   color: #1a1a1a;

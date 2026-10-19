@@ -4,25 +4,48 @@
             <span class="subtitle-tag">VOTRE CINÉMATHÈQUE PERSONNELLE</span>
             <h1>Ma bibliothèque</h1>
         </div>
-        <div class="stats-grid">
-            <div class="stat-card">
+        <button
+          class="stats-toggle"
+          type="button"
+          :aria-expanded="showStats"
+          aria-controls="library-statistics"
+          @click="showStats = !showStats"
+        >
+          <span>{{ showStats ? 'Masquer les statistiques' : 'Afficher les statistiques' }}</span>
+          <span class="stats-toggle-icon" :class="{ expanded: showStats }" aria-hidden="true">⌄</span>
+        </button>
+        <Transition name="stats-slide">
+          <div v-if="showStats" id="library-statistics" class="stats-panel">
+            <div class="stats-grid">
+              <div class="stat-card">
                 <div class="stat-number">{{ library.length }}</div>
                 <div class="stat-label">Dans ma collection</div>
-            </div>
-            <div class="stat-card">
+              </div>
+              <div class="stat-card">
                 <div class="stat-number">{{ watchedCount }}</div>
                 <div class="stat-label">Films vus</div>
-            </div>
-            <div class="stat-card">
+              </div>
+              <div class="stat-card">
+                <div class="stat-number">{{ remainingCount }}</div>
+                <div class="stat-label">Films restants</div>
+              </div>
+              <div class="stat-card">
                 <div class="stat-number">{{ favoritesCount }}</div>
                 <div class="stat-label">Favoris</div>
-            </div>
-            <div class="stat-card">
+              </div>
+              <div class="stat-card">
+                <div class="stat-number">{{ averagePersonalRatingLabel }}</div>
+                <div class="stat-label">Note personnelle moyenne</div>
+                <div class="stat-note">{{ ratedMoviesInfo }}</div>
+              </div>
+              <div class="stat-card">
                 <div class="stat-number">{{ watchedRuntimeLabel }}</div>
                 <div class="stat-label">Temps de visionnage</div>
                 <div class="stat-note">{{ watchedRuntimeInfo }}</div>
+              </div>
             </div>
-        </div>
+          </div>
+        </Transition>
 
     <div class="tabs-row">
         <button 
@@ -36,13 +59,21 @@
     </div>
 
     <div class="filter-toolbar">
-    <div class="search-box-container">
-      <SearchBar 
-        v-model="searchQuery" 
-        placeholder="Rechercher dans ma bibliothèque..."
-      />
+      <div class="search-box-container">
+        <SearchBar
+          v-model="searchQuery"
+          placeholder="Rechercher dans ma bibliothèque..."
+        />
+      </div>
+      <label class="sort-control">
+        <span>Trier par</span>
+        <select v-model="sortBy" aria-label="Trier les films de la bibliothèque">
+          <option value="dateAdded">Date d'ajout (plus récent)</option>
+          <option value="title">Titre (A à Z)</option>
+          <option value="year">Année (plus récent)</option>
+        </select>
+      </label>
     </div>
-  </div>
 
     <div class="movies-grid" v-if="filteredLibrary.length > 0">
       <div class="library-movie-card" v-for="movie in filteredLibrary" :key="movie.id" @click="goToDetails(movie.id)">
@@ -68,6 +99,7 @@
         <div class="movie-info">
           <h3>{{ movie.title }}</h3>
           <p>{{ movie.genre || 'Film' }} · {{ movie.year }}</p>
+          <p class="movie-runtime">{{ formatMovieRuntime(movie) }}</p>
         </div>
       </div>
     </div>
@@ -86,6 +118,7 @@
 import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
+import { getMovieRuntimeMinutes } from '../services/api.js';
 import SearchBar from '../components/SearchBar.vue'
 
 const store = useStore();
@@ -93,6 +126,8 @@ const route = useRoute();
 const router = useRouter();
 
 const searchQuery = ref('');
+const sortBy = ref('dateAdded');
+const showStats = ref(true);
 const currentTab = ref(route.name === 'favorites' ? 'favorites' : 'all');
 
 const tabs = [
@@ -106,7 +141,23 @@ const tabs = [
 const library = computed(() => store.state.library);
 
 const watchedCount = computed(() => library.value.filter(m => m.status === 'watched').length);
+const remainingCount = computed(() => library.value.length - watchedCount.value);
 const favoritesCount = computed(() => library.value.filter(m => m.isFavorite).length);
+const ratedMovies = computed(() => library.value
+  .map(movie => Number(store.state.reviews[movie.id]?.rating ?? movie.personalRating))
+  .filter(rating => Number.isFinite(rating) && rating >= 1 && rating <= 5)
+);
+const averagePersonalRating = computed(() => ratedMovies.value.length
+  ? ratedMovies.value.reduce((total, rating) => total + rating, 0) / ratedMovies.value.length
+  : null
+);
+const averagePersonalRatingLabel = computed(() => averagePersonalRating.value === null
+  ? '—'
+  : `${averagePersonalRating.value.toFixed(1)} / 5`
+);
+const ratedMoviesInfo = computed(() =>
+  `${ratedMovies.value.length} film${ratedMovies.value.length === 1 ? '' : 's'} noté${ratedMovies.value.length === 1 ? '' : 's'}`
+);
 const watchedRuntimeEntries = computed(() => library.value
   .filter(movie => movie.status === 'watched')
   .map(movie => getRuntimeMinutes(movie))
@@ -151,6 +202,41 @@ function getRuntimeMinutes(movie) {
   return Number(match[1] || 0) * 60 + Number(match[2] || 0);
 }
 
+function formatMovieRuntime(movie) {
+  const runtime = getRuntimeMinutes(movie);
+  if (runtime === null) return 'Durée inconnue';
+
+  const hours = Math.floor(runtime / 60);
+  const minutes = runtime % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
+watch(
+  () => library.value.map(movie => movie.id).join(','),
+  async () => {
+    const moviesMissingRuntime = library.value.filter(movie => getRuntimeMinutes(movie) === null);
+    const runtimes = await Promise.all(moviesMissingRuntime.map(async movie => ({
+      movieId: movie.id,
+      runtimeMinutes: await getMovieRuntimeMinutes(movie.id)
+    })));
+
+    runtimes.forEach(({ movieId, runtimeMinutes }) => {
+      if (runtimeMinutes === null) return;
+
+      const movie = library.value.find(item => item.id === movieId);
+      if (!movie || getRuntimeMinutes(movie) !== null) return;
+
+      store.commit('ADD_TO_LIBRARY', {
+        movie: { ...movie, runtimeMinutes },
+        status: movie.status
+      });
+    });
+  },
+  { immediate: true }
+);
+
 const getTabCount = (tabId) => {
   if (tabId === 'all') return library.value.length;
   if (tabId === 'favorites') return library.value.filter(m => m.isFavorite).length;
@@ -176,7 +262,17 @@ const filteredLibrary = computed(() => {
     result = result.filter(m => m.title.toLowerCase().includes(query));
   }
 
-  return result;
+  return [...result].sort((first, second) => {
+    if (sortBy.value === 'title') {
+      return first.title.localeCompare(second.title, 'fr', { sensitivity: 'base' });
+    }
+
+    if (sortBy.value === 'year') {
+      return (Number.parseInt(second.year, 10) || 0) - (Number.parseInt(first.year, 10) || 0);
+    }
+
+    return (Date.parse(second.dateAdded) || 0) - (Date.parse(first.dateAdded) || 0);
+  });
 });
 
 const selectTab = (tabId) => {
@@ -197,8 +293,6 @@ watch(() => route.name, (name) => {
   }
 });
 
-// TODO: ajouter un filtre de genres dans la bibliothèque et le combiner aux onglets et à la recherche existants.
-
 const formatStatus = (status) => {
   if (status === 'watched') return 'Vu';
   if (status === 'to-watch') return 'À voir';
@@ -210,7 +304,14 @@ const goToDetails = (id) => {
 };
 
 const removeFromLibrary = (movieId) => {
+  const movie = library.value.find(item => item.id === movieId);
+  if (!movie) return;
+
+  const confirmed = window.confirm(`Supprimer « ${movie.title} » de votre bibliothèque ?`);
+  if (!confirmed) return;
+
   store.commit('REMOVE_FROM_LIBRARY', movieId);
+  store.commit('SHOW_NOTIFICATION', `${movie.title} a été supprimé de votre bibliothèque.`);
 };
 </script>
 
@@ -220,8 +321,7 @@ const removeFromLibrary = (movieId) => {
   min-height: 100vh;
   padding: 3rem 4rem;
   color: #1a1a1a;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .library-header .subtitle-tag {
@@ -240,9 +340,72 @@ const removeFromLibrary = (movieId) => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5rem;
-  margin-bottom: 2.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.stats-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: -1rem 0 1.25rem;
+  padding: 0.45rem 0;
+  border: 0;
+  background: transparent;
+  color: #8f4528;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stats-toggle:hover {
+  color: #b85d38;
+}
+
+.stats-toggle:focus-visible {
+  outline: 2px solid #b85d38;
+  outline-offset: 3px;
+}
+
+.stats-toggle-icon {
+  display: inline-block;
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 0.25s ease;
+}
+
+.stats-toggle-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.stats-slide-enter-active,
+.stats-slide-leave-active {
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.25s ease, transform 0.3s ease;
+}
+
+.stats-slide-enter-from,
+.stats-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.stats-slide-enter-to,
+.stats-slide-leave-from {
+  max-height: 1000px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-slide-enter-active,
+  .stats-slide-leave-active,
+  .stats-toggle-icon {
+    transition-duration: 0.01ms;
+  }
 }
 
 .stat-card {
@@ -314,6 +477,10 @@ const removeFromLibrary = (movieId) => {
 }
 
 .filter-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
@@ -438,6 +605,11 @@ const removeFromLibrary = (movieId) => {
   color: #666;
 }
 
+.movie-info .movie-runtime {
+  margin-top: 0.2rem;
+  color: #8a8178;
+}
+
 .empty-state {
   text-align: center;
   padding: 4rem;
@@ -451,5 +623,46 @@ const removeFromLibrary = (movieId) => {
 
 .search-box-container {
   max-width: 400px;
+  flex: 1;
+}
+
+.sort-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.sort-control select {
+  min-height: 42px;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #dcd6c8;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-box-container {
+    max-width: none;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

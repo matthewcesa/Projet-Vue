@@ -29,7 +29,6 @@
             </div>
 
             <div class="actions">
-              <!-- TODO: garder le style du cœur synchronisé avec l'état favori (rouge si actif, blanc sinon). -->
               <button
                 class="btn-secondary"
                 type="button"
@@ -208,15 +207,25 @@ const saveReview = () => {
 const toggleWatched = () => {
   if (!movie.value) return;
 
+  const alreadyInLibrary = store.getters.isInLibrary(movie.value.id);
+  const nextStatus = isWatched.value ? 'to-watch' : 'watched';
   store.commit('ADD_TO_LIBRARY', {
     movie: movie.value,
-    status: isWatched.value ? 'to-watch' : 'watched'
+    status: nextStatus
   });
+
+  store.commit('SHOW_NOTIFICATION', alreadyInLibrary
+    ? `${movie.value.title} est maintenant ${nextStatus === 'watched' ? 'marqué comme vu' : 'à voir'}.`
+    : `${movie.value.title} a été ajouté à votre bibliothèque et marqué comme vu.`);
 };
 
 const toggleFavorite = () => {
   if (movie.value) {
+    const alreadyInLibrary = store.getters.isInLibrary(movie.value.id);
     store.commit('TOGGLE_FAVORITE', movie.value);
+    if (!alreadyInLibrary) {
+      store.commit('SHOW_NOTIFICATION', `${movie.value.title} a été ajouté à votre bibliothèque et à vos favoris.`);
+    }
   }
 };
 </script>

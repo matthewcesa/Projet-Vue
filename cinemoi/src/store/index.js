@@ -3,6 +3,7 @@ import { createStore } from 'vuex';
 const ACCOUNTS_KEY = 'cinemoi_accounts';
 const SESSION_KEY = 'cinemoi_session';
 const LEGACY_LIBRARY_KEY = 'cinemoi_library';
+let nextNotificationId = 0;
 
 function readJson(key, fallback, storage = localStorage) {
   try {
@@ -19,7 +20,24 @@ function saveJson(key, value) {
 }
 
 function getAccountLibrary(userId) {
-  return readJson(`cinemoi_library_${userId}`, []);
+  const storageKey = `cinemoi_library_${userId}`;
+  const library = readJson(storageKey, []);
+  let migrated = false;
+  const libraryWithDates = library.map((movie, index) => {
+    if (movie.dateAdded) return movie;
+
+    migrated = true;
+    return {
+      ...movie,
+      dateAdded: new Date(Date.now() - (library.length - index) * 1000).toISOString()
+    };
+  });
+
+  if (migrated) {
+    saveJson(storageKey, libraryWithDates);
+  }
+
+  return libraryWithDates;
 }
 
 function getAccountReviews(userId) {
@@ -72,10 +90,24 @@ export default createStore({
     accounts: initialAuth.accounts,
     user: initialAuth.user,
     library: initialAuth.library,
-    reviews: initialAuth.reviews
+    reviews: initialAuth.reviews,
+    notification: null
   },
 
   mutations: {
+    SHOW_NOTIFICATION(state, message) {
+      state.notification = {
+        id: ++nextNotificationId,
+        message
+      };
+    },
+
+    CLEAR_NOTIFICATION(state, notificationId) {
+      if (state.notification?.id === notificationId) {
+        state.notification = null;
+      }
+    },
+
     SET_ACCOUNTS(state, accounts) {
       state.accounts = accounts;
       saveJson(ACCOUNTS_KEY, accounts);
@@ -127,9 +159,19 @@ export default createStore({
       const nextLibrary = [...state.library];
 
       if (existingIndex >= 0) {
-        nextLibrary[existingIndex] = { ...nextLibrary[existingIndex], ...movie, status };
+        const existingMovie = nextLibrary[existingIndex];
+        nextLibrary[existingIndex] = {
+          ...existingMovie,
+          ...movie,
+          dateAdded: existingMovie.dateAdded || movie.dateAdded || new Date().toISOString(),
+          status
+        };
       } else {
-        nextLibrary.push({ ...movie, status });
+        nextLibrary.push({
+          ...movie,
+          dateAdded: movie.dateAdded || new Date().toISOString(),
+          status
+        });
       }
 
       this.commit('SET_LIBRARY', nextLibrary);
@@ -145,19 +187,16 @@ export default createStore({
         ? state.library.map(item => item.id === movie.id
           ? { ...item, isFavorite: !item.isFavorite }
           : item)
-        : [...state.library, { ...movie, status: 'to-watch', isFavorite: true }];
+        : [...state.library, {
+          ...movie,
+          dateAdded: movie.dateAdded || new Date().toISOString(),
+          status: 'to-watch',
+          isFavorite: true
+        }];
 
       this.commit('SET_LIBRARY', nextLibrary);
     },
 
-    UPDATE_MOVIE_REVIEW(state, { movieId, rating, review }) {
-      const existing = state.library.find(item => item.id === movieId);
-      if (!existing) return;
-
-      this.commit('SET_LIBRARY', state.library.map(item => item.id === movieId
-        ? { ...item, personalRating: rating, review }
-        : item));
-    }
   },
 
   actions: {
