@@ -28,7 +28,7 @@
             v-for="tab in tabs" 
             :key="tab.id"
             :class="['tab-btn', { active: currentTab === tab.id }]"
-            @click="currentTab = tab.id"
+            @click="selectTab(tab.id)"
         >
             {{ tab.label }} <span class="tab-count">{{ getTabCount(tab.id) }}</span>
         </button>
@@ -72,16 +72,17 @@
 /* Grille des films filtrés. */
 /* Message affiché quand aucun film ne correspond. */
 
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import SearchBar from '../components/SearchBar.vue'
 
 const store = useStore();
+const route = useRoute();
 const router = useRouter();
 
 const searchQuery = ref('');
-const currentTab = ref('all');
+const currentTab = ref(route.name === 'favorites' ? 'favorites' : 'all');
 
 const tabs = [
   { id: 'all', label: 'Tous' },
@@ -106,11 +107,11 @@ const getTabCount = (tabId) => {
 
 // Filtrage dynamique (Onglets + Recherche locale)
 const filteredLibrary = computed(() => {
-  let result = library.value;
+  let result = currentTab.value === 'favorites'
+    ? store.getters.favorites
+    : library.value;
 
-  if (currentTab.value === 'favorites') {
-    result = result.filter(m => m.isFavorite);
-  } else if (currentTab.value === 'watched') {
+  if (currentTab.value === 'watched') {
     result = result.filter(m => m.status === 'watched');
   } else if (currentTab.value === 'to-watch') {
     result = result.filter(m => m.status === 'to-watch');
@@ -122,6 +123,24 @@ const filteredLibrary = computed(() => {
   }
 
   return result;
+});
+
+const selectTab = (tabId) => {
+  currentTab.value = tabId;
+
+  if (tabId === 'favorites' && route.name !== 'favorites') {
+    router.push({ name: 'favorites' });
+  } else if (tabId !== 'favorites' && route.name === 'favorites') {
+    router.push({ name: 'library' });
+  }
+};
+
+watch(() => route.name, (name) => {
+  if (name === 'favorites') {
+    currentTab.value = 'favorites';
+  } else if (name === 'library') {
+    currentTab.value = 'all';
+  }
 });
 
 // TODO: ajouter un filtre de genres dans la bibliothèque et le combiner aux onglets et à la recherche existants.

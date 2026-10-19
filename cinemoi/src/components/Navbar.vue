@@ -11,6 +11,7 @@
     <nav v-if="user" class="navbar-center">
       <router-link to="/" class="nav-item">Découvrir</router-link>
       <router-link to="/library" class="nav-item">Ma bibliothèque</router-link>
+      <router-link to="/favorites" class="nav-item">Favoris</router-link>
       <router-link to="/lists" class="nav-item">Listes</router-link>
     </nav>
 

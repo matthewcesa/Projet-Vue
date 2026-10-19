@@ -38,8 +38,15 @@
               >
                 <span aria-hidden="true">{{ isFavorite ? '♥' : '♡' }}</span> Favori
               </button>
-              <button class="btn-secondary" type="button" @click="updateStatus('watched')">
-                <span aria-hidden="true">✓</span> Marquer comme vu
+              <button
+                class="btn-secondary"
+                :class="{ 'status-watched': isWatched }"
+                type="button"
+                :aria-pressed="isWatched"
+                @click="toggleWatched"
+              >
+                <span aria-hidden="true">{{ isWatched ? '✓' : '○' }}</span>
+                {{ isWatched ? 'Vu' : 'Marquer comme vu' }}
               </button>
             </div>
           </div>
@@ -148,6 +155,10 @@ const isFavorite = computed(() =>
   store.state.library.some(item => item.id === movie.value?.id && item.isFavorite)
 );
 
+const isWatched = computed(() =>
+  store.state.library.some(item => item.id === movie.value?.id && item.status === 'watched')
+);
+
 watch(() => [route.params.id, store.state.user?.id], async ([movieId]) => {
   movie.value = null;
   recommendedMovies.value = [];
@@ -194,12 +205,12 @@ const saveReview = () => {
   reviewSaved.value = persistReview();
 };
 
-const updateStatus = (status) => {
+const toggleWatched = () => {
   if (!movie.value) return;
 
   store.commit('ADD_TO_LIBRARY', {
     movie: movie.value,
-    status
+    status: isWatched.value ? 'to-watch' : 'watched'
   });
 };
 
@@ -450,6 +461,12 @@ const toggleFavorite = () => {
 .btn-secondary[aria-pressed='true'] {
   border-color: #e06b58;
   color: #ff9a85;
+}
+
+.btn-secondary.status-watched {
+  border-color: #4d9b68;
+  background: rgba(77, 155, 104, 0.16);
+  color: #8bd3a1;
 }
 
 .details-lower {

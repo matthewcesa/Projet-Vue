@@ -20,6 +20,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/favorites',
+    name: 'favorites',
+    component: Library,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/movie/:id',
     name: 'details',
     component: Details,
