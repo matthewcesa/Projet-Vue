@@ -52,6 +52,16 @@
             {{ formatStatus(movie.status) }}
           </span>
 
+          <button
+            class="remove-movie-button"
+            type="button"
+            :aria-label="`Supprimer ${movie.title} de la bibliothèque`"
+            :title="`Supprimer ${movie.title} de la bibliothèque`"
+            @click.stop="removeFromLibrary(movie.id)"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+
           <div class="rating">⭐ {{ movie.rating }}</div>
         </div>
         <div class="movie-info">
@@ -153,6 +163,10 @@ const formatStatus = (status) => {
 
 const goToDetails = (id) => {
   router.push({ name: 'details', params: { id } });
+};
+
+const removeFromLibrary = (movieId) => {
+  store.commit('REMOVE_FROM_LIBRARY', movieId);
 };
 </script>
 
@@ -295,6 +309,34 @@ const goToDetails = (id) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.remove-movie-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font: inherit;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.remove-movie-button:hover {
+  border-color: #b85d38;
+  background: #b85d38;
+}
+
+.remove-movie-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .status-badge {
