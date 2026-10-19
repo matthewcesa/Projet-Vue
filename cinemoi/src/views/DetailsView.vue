@@ -45,7 +45,7 @@
                 :aria-pressed="isWatched"
                 @click="toggleWatched"
               >
-                <span aria-hidden="true">{{ isWatched ? '✓' : '○' }}</span>
+                <span aria-hidden="true">{{ isWatched ? '✓' : '' }}</span>
                 {{ isWatched ? 'Vu' : 'Marquer comme vu' }}
               </button>
             </div>
