@@ -18,8 +18,9 @@
                 <div class="stat-label">Favoris</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">-- h</div>
-                <div class="stat-label">Temps de cinéma</div>
+                <div class="stat-number">{{ watchedRuntimeLabel }}</div>
+                <div class="stat-label">Temps de visionnage</div>
+                <div class="stat-note">{{ watchedRuntimeInfo }}</div>
             </div>
         </div>
 
@@ -106,6 +107,49 @@ const library = computed(() => store.state.library);
 
 const watchedCount = computed(() => library.value.filter(m => m.status === 'watched').length);
 const favoritesCount = computed(() => library.value.filter(m => m.isFavorite).length);
+const watchedRuntimeEntries = computed(() => library.value
+  .filter(movie => movie.status === 'watched')
+  .map(movie => getRuntimeMinutes(movie))
+);
+const knownWatchedRuntimeMinutes = computed(() => watchedRuntimeEntries.value
+  .filter(runtime => runtime !== null)
+  .reduce((total, runtime) => total + runtime, 0)
+);
+const knownWatchedRuntimeCount = computed(() =>
+  watchedRuntimeEntries.value.filter(runtime => runtime !== null).length
+);
+const watchedRuntimeLabel = computed(() => {
+  if (watchedCount.value > 0 && knownWatchedRuntimeCount.value === 0) {
+    return 'Indisponible';
+  }
+
+  const hours = Math.floor(knownWatchedRuntimeMinutes.value / 60);
+  const minutes = knownWatchedRuntimeMinutes.value % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+});
+const watchedRuntimeInfo = computed(() => {
+  if (watchedCount.value === 0) return 'Aucun film vu pour le moment';
+  if (knownWatchedRuntimeCount.value < watchedCount.value) {
+    return `Durée connue pour ${knownWatchedRuntimeCount.value}/${watchedCount.value} films vus`;
+  }
+  return 'Durée totale des films marqués vus';
+});
+
+function getRuntimeMinutes(movie) {
+  const runtimeMinutes = Number(movie.runtimeMinutes);
+  if (Number.isFinite(runtimeMinutes) && runtimeMinutes > 0) {
+    return runtimeMinutes;
+  }
+
+  if (typeof movie.runtime !== 'string') return null;
+
+  const match = movie.runtime.match(/^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*min)?\s*$/i);
+  if (!match || (!match[1] && !match[2])) return null;
+
+  return Number(match[1] || 0) * 60 + Number(match[2] || 0);
+}
 
 const getTabCount = (tabId) => {
   if (tabId === 'all') return library.value.length;
@@ -219,6 +263,13 @@ const removeFromLibrary = (movieId) => {
   font-size: 0.85rem;
   color: #666;
   margin-top: 0.2rem;
+}
+
+.stat-note {
+  margin-top: 0.35rem;
+  color: #817a74;
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .tabs-row {
