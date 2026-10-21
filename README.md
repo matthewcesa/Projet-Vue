@@ -10,6 +10,8 @@ les films vus ou à voir.
 - Prénom 1 : Matthew-Frederick CESA
 - Prénom 2 : Constant NGYUEN
 
+- Lien vers figma : [Figma](https://www.figma.com/design/b8a6GiNz7HiiPmGq2jI25N/CIn%C3%A9moi?node-id=0-1&t=AYNVMrReCwDgP6MQ-1)
+
 ## Technologies
 
 - Vue 3
