@@ -16,12 +16,6 @@
             />
           </div>
         </div>
-
-        <div class="hero-card-right">
-          <span class="selection-tag">SÉLECTION DU JOUR</span>
-          <h2>Cinéma et mémoire</h2>
-          <p>Six récits qui filment ce que le temps laisse derrière lui.</p>
-        </div>
       </div>
     </div>
 
